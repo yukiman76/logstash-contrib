@@ -37,6 +37,9 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
 
   # Elasticsearch query string
   config :query, :validate => :string
+  
+  # Elasticsearch query string
+  config :index, :validate => :string
 
   # Comma-delimited list of <field>:<direction> pairs that define the sort order
   config :sort, :validate => :string, :default => "@timestamp:desc"
@@ -58,9 +61,14 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
 
     begin
       query_str = event.sprintf(@query)
+      index_str = event.sprintf(@index)
 
-      results = @client.search q: query_str, sort: @sort, size: 1
-
+      if not index_str
+        results = @client.search q: query_str, sort: @sort, size: 1
+      else
+        results = @client.search index: index_str, q: query_str, sort: @sort, size: 1
+      end
+      
       @fields.each do |old, new|
         event[new] = results['hits']['hits'][0]['_source'][old]
       end
