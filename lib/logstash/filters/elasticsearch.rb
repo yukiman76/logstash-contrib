@@ -38,7 +38,7 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
   # Elasticsearch query string
   config :query, :validate => :string
   
-  # Elasticsearch query string
+  # Elasticsearch index string
   config :index, :validate => :string
 
   # Comma-delimited list of <field>:<direction> pairs that define the sort order
