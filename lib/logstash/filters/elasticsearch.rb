@@ -41,7 +41,7 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
   # Elasticsearch index string
   config :index, :validate => :string
 
-  # Comma-delimited list of <field>:<direction> pairs that define the sort order
+  # Comma-delimited list of <field>:<direction> pairs that define the sort order set to blank to disable sort
   config :sort, :validate => :string, :default => "@timestamp:desc"
 
   # Hash of fields to copy from old event (found via elasticsearch) into new event
@@ -55,6 +55,13 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
     @client = Elasticsearch::Client.new hosts: @hosts
   end # def register
 
+  #public
+  #def teardown
+  #  if server?
+  #    @interrupted = true
+  #  end
+  #end # def teardown
+  
   public
   def filter(event)
     return unless filter?(event)
@@ -62,21 +69,28 @@ class LogStash::Filters::Elasticsearch < LogStash::Filters::Base
     begin
       query_str = event.sprintf(@query)
       index_str = event.sprintf(@index)
-
-      if not index_str
-        results = @client.search q: query_str, sort: @sort, size: 1
-      else
-        results = @client.search index: index_str, q: query_str, sort: @sort, size: 1
-      end
+      sort_str  = event.sprintf(@sort)
       
-      @fields.each do |old, new|
-        event[new] = results['hits']['hits'][0]['_source'][old]
+      if not index_str
+        results = @client.search q: query_str, sort: sort_str, size: 1
+      else
+          if sort_str != ''#add ability to disable sort         
+            results = @client.search index: index_str, q: query_str, sort: sort_str, size: 1
+          else
+            results = @client.search index: index_str, q: query_str, size: 1
+          end
+      end
+
+      if results != nil and results['hits']['total'] > 0
+        @fields.each do |old, new|
+          event[new] = results['hits']['hits'][0]['_source'][old]
+        end
       end
 
       filter_matched(event)
     rescue => e
       @logger.warn("Failed to query elasticsearch for previous event",
-                   :query => query_str, :event => event, :error => e)
+                   :query => query_str, :event => event, :error => e, :results => results)
     end
   end # def filter
 end # class LogStash::Filters::Elasticsearch
